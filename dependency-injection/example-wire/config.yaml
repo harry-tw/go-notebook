@@ -1,0 +1,2 @@
+db_url: localhost:6379
+cache_size: 10
