@@ -17,22 +17,31 @@ func intGenerator(done <-chan interface{}) <-chan int {
 			select {
 			case <-done:
 				return
-			case out <- rand.Intn(100):
+			case out <- rand.Intn(1000000000) + 2:
 			}
 		}
 	}()
 	return out
 }
 
-func multiply(done <-chan interface{}, in <-chan int, by int) <-chan int {
+func searchPrime(done <-chan interface{}, in <-chan int) <-chan int {
 	out := make(chan int)
 	go func() {
 		defer close(out)
 		for val := range in {
-			select {
-			case <-done:
-				return
-			case out <- val * by:
+			isPrime := true
+			for i := 2; i <= val/2; i++ {
+				if val%i == 0 {
+					isPrime = false
+					break
+				}
+			}
+			if isPrime {
+				select {
+				case <-done:
+					return
+				case out <- val:
+				}
 			}
 		}
 	}()
@@ -90,13 +99,15 @@ func main() {
 	done := make(chan interface{})
 	defer close(done)
 
+	start := time.Now()
 	generator := intGenerator(done)
 	workerFunc := func() <-chan int {
-		return multiply(done, generator, 2)
+		return searchPrime(done, generator)
 	}
 	workers := fanOut(runtime.NumCPU(), workerFunc)
 	for result := range getResult(done, fanIn(done, workers...), 10) {
 		fmt.Println(result)
 	}
+	fmt.Printf("took times: %v\n", time.Since(start))
 	return
 }
