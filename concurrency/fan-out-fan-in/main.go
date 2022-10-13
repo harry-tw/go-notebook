@@ -23,6 +23,7 @@ func intGenerator(done <-chan interface{}) <-chan int {
 	}()
 	return out
 }
+
 func multiply(done <-chan interface{}, in <-chan int, by int) <-chan int {
 	out := make(chan int)
 	go func() {
@@ -37,6 +38,7 @@ func multiply(done <-chan interface{}, in <-chan int, by int) <-chan int {
 	}()
 	return out
 }
+
 func fanIn(done <-chan interface{}, ins ...<-chan int) <-chan int {
 	var wg sync.WaitGroup
 	out := make(chan int)
@@ -76,10 +78,10 @@ func getResult(done chan interface{}, in <-chan int, num int) <-chan int {
 	return out
 }
 
-func fanOut(num int, worker <-chan int) []<-chan int {
-	workers := make([]<-chan int, num)
-	for i := 0; i < num; i++ {
-		workers[i] = worker
+func fanOut(workerNums int, workerFunc func() <-chan int) []<-chan int {
+	workers := make([]<-chan int, workerNums)
+	for i := 0; i < workerNums; i++ {
+		workers[i] = workerFunc()
 	}
 	return workers
 }
@@ -89,7 +91,10 @@ func main() {
 	defer close(done)
 
 	generator := intGenerator(done)
-	workers := fanOut(runtime.NumCPU(), multiply(done, generator, 2))
+	workerFunc := func() <-chan int {
+		return multiply(done, generator, 2)
+	}
+	workers := fanOut(runtime.NumCPU(), workerFunc)
 	for result := range getResult(done, fanIn(done, workers...), 10) {
 		fmt.Println(result)
 	}
