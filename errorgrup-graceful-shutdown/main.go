@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -45,6 +46,26 @@ func main() {
 				return err
 			}
 			log.Println("shutdown server")
+		}
+		return nil
+	})
+	// run pprof
+	pprof := http.Server{Addr: "localhost:6060"}
+	errGrp.Go(func() error {
+		log.Println("run pprof")
+		if err := pprof.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
+	// gracefully shutdown pprof based on errgroup context
+	errGrp.Go(func() error {
+		select {
+		case <-errGrpCtx.Done():
+			if err := pprof.Shutdown(context.Background()); err != nil {
+				return err
+			}
+			log.Println("shutdown pprof")
 		}
 		return nil
 	})
